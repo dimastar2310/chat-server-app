@@ -10,8 +10,7 @@ import * as chat_controller from './public_chat.controller.mjs';
 import raw from "../../middleware/route.async.wrapper.mjs";
 
 //lets say all is public chat here 
-import ms from 'ms'
-import session from 'express-session'
+
 
 
 const router = express.Router();
@@ -19,18 +18,34 @@ const router = express.Router();
 router.use(express.json());
 //this cookie is for the session
 //session should be stored here 
-router.use(session({ 
-  secret: 'key that will sign cookie', 
-  cookie: { maxAge: ms('30s') }
-}))
+
 
 // Route to get all chats for a user
-router.get('/retrive_message', raw(async (req, res) => {
-  const { user } = req.params; //this might be good after for private chat
-  const chats = await chat_controller.getChatsByUser();
-  res.status(200).json(chats);
-}));
+// Middleware to verify user authentication
+const verifyAuth = (req, res, next) => {
+  console.log('verifyAuth', req.url);
+  if (req.session.user) {
+    console.log('verifyAuth2', req.url);
+    next(); // User is authenticated, proceed to the next middleware/route
+  } else {
+    res.redirect('/api/users/login'); // Redirect unauthenticated user to login page
+  }
+};
 
+router.get('/retrive_message', async (req, res) => {
+  try {
+    // log.obj(req.session, 'req.session:');
+    // // Assuming you use the user data from the session to retrieve chats
+    // const user = req.session.user;
+    if(req.session.user){
+    console.log('req.session.user2', req.session.user);
+    const chats = await chat_controller.getChatsByUser();
+    res.status(200).json(chats);
+    }
+  } catch (error) {
+    res.status(500).json({ status: 'Error', message: 'Internal Server Error.' });
+  }
+});
 // Route to get all chats for a user
 // router.get('/retrive_message/:user', raw(async (req, res) => {
 //   const { user } = req.params;

@@ -25,40 +25,34 @@ router.use(express.json())
 
 // log.magenta('verifyAuth',req.url)
 // log.obj(req.session,'req.session:')
-router.post("/login",raw(async (req, res) => {
+router.post("/login", async (req, res) => {
   const { user:username, password } = req.body;
 
+  try {
+    const user = await user_controller.getOneByUser(username);
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(403).json({ status: "Invalid credentials." });
+    }
 
-  const user = await user_controller.getOneByUser(username);
-  if (!user) return res.status(403).json({ status: "username or possword is wrong!." });
-  //console.log("the username is ?",user);
-  //console.log("the password is ?",password);
-  
-  const password_is_valid = await bcrypt.compare(password, user.password)
-  if (!password_is_valid) return res.status(403).json({ status: "username or possword is wrong!." });
-
-
-  req.isAuthenticated = true;
-  res.status(200).json(user);
-  // Assuming '/chat' is a frontend route, send a response indicating success.
- // res.redirect(200, '/chat'); redirection not so needed ,i can make 2 fetches in fron server
-})
-);
-
-const verifyAuth = (req,res,next)=>{
-  if(req.session.user){
-      next()
-  }else{
-      res.status(403).json({status:'unauthorized',payload:'You are unauthorized to access this route'})
+    req.session.user = user; // Set user data in the session after successful login
+    log.obj(req.session.user, "req.session.user:");;
+    res.status(200).json({ status: "Logged in successfully.", user });
+  } catch (err) {
+    res.status(500).json({ status: "Internal Server Error." });
   }
-}
-//dont forget to make button for this
-router.get('/logout',(req,res)=>{
-  req.isAuthenticated = false;
-  res.status(200).json({status:'You are logged out'})
-})
+});
 
-router.get('/protected',verifyAuth,(req,res)=>{ //i need to redirect it to chat
+router.get("/logout", async (req, res) => {
+  try {
+    req.session.destroy(); // Destroy the session to log the user out
+    res.status(200).json({ status: "Logged out successfully." });
+  } catch (err) {
+    res.status(500).json({ status: "Internal Server Error." });
+  }
+});
+
+
+router.get('/protected',(req,res)=>{ //i need to redirect it to chat
   res.status(200).json({status:'OK',payload:'some sensitive data'})
 })
 // CREATES A NEW USER

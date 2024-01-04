@@ -12,6 +12,8 @@ import * as chat_controller from './modules/public_chat/public_chat.controller.m
 import public_router from './modules/public_chat/public_chat.router.mjs';
 import { error_handler, error_handler2, not_found } from './middleware/errors.handler.mjs';
 
+import ms from 'ms'
+import session from 'express-session'
 
 
 const {
@@ -30,17 +32,27 @@ const io = new Server(server, {
    
   },
 });
+app.use(session({ 
+  secret: "some secret key", 
+  resave: false, //we want new sessions only
+  saveUninitialized: false, //if we didnt initialize with cookie, dont save it
+  cookie: { maxAge: ms('30s') }
+}))
+
 
 
 app.use(cors());
 app.use(morgan('dev'));
 
 app.use('/api/users', user_router);
-app.use('/api/public_chat', public_router);
+app.use('/api/public_chat',public_router);//,verifyAuth
 app.use('/api/chat_room', chat_router);
 
-app.use(error_handler);
-app.use(error_handler2);
+
+
+
+//app.use(error_handler);
+//app.use(error_handler2);
 
 app.use('*', not_found);
 
