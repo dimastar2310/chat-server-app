@@ -1,45 +1,72 @@
-//require('dotenv').config();
-import express from 'express'
-import morgan from 'morgan'
-import log from '@ajar/marker'
-import cors from 'cors'
+import express from 'express';
+import http from 'http';
+import { Server } from 'socket.io';
+import morgan from 'morgan';
+import log from '@ajar/marker';
+import cors from 'cors';
 
-import {connect_db} from './db/mongo.connection.mjs';
+import { connect_db } from './db/mongo.connection.mjs';
 import user_router from './modules/user/user.router.mjs';
+import chat_router from './modules/chat/chat.router.mjs';
+import * as chat_controller from './modules/public_chat/public_chat.controller.mjs'
+import public_router from './modules/public_chat/public_chat.router.mjs';
+import { error_handler, error_handler2, not_found } from './middleware/errors.handler.mjs';
 
-import {error_handler,error_handler2,not_found} from './middleware/errors.handler.mjs';   
 
-const { 
+
+const {
   PORT = 8080,
-  HOST = 'localhost', 
+  HOST = 'localhost',
   DB_URI,
-  DB_NAME
- } = process.env;
+  DB_NAME,
+  CLIENT_URL = 'http://localhost:5173', // Adjust with your client URL
+} = process.env;
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: ['http://localhost:5173'],
+   
+  },
+});
 
-//log.red(`the DBNAME  IS =${DB_NAME}`);
-//log.red(`the PORT  IS =${PORT}`);
-// middleware
+
 app.use(cors());
 app.use(morgan('dev'));
 
-// routing
-// app.use('/api/stories', story_router);
 app.use('/api/users', user_router);
+app.use('/api/public_chat', public_router);
+app.use('/api/chat_room', chat_router);
 
-// central error handling
-//if error happens does functionion will be triggered
 app.use(error_handler);
 app.use(error_handler2);
 
-//when no routes were matched...
 app.use('*', not_found);
 
-//start the express api server
-(async ()=> {
-  //connect to mongo db
-  await connect_db(DB_URI,DB_NAME);  
-  await app.listen(PORT,HOST);
-  log.magenta(`api is live on`,` ✨ ⚡  http://${HOST}:${PORT} ✨ ⚡`);  
+io.on('connection', (socket) => {
+  log.debug('client connected');
+  log.yellow(socket.id);
+  // socket.emit('server-msg', { message: 'Welcome to the chat!' });
+
+  socket.on('client-msg', (data) => {
+
+    log.obj(data, 'client says: ');
+    chat_controller.sendMessage(data.message.username,data.message.text);
+  
+    // Parse the timestamp into a Date object
+    //message.timestamp = new Date(message.timestamp);
+  
+    io.sockets.emit('server-msg', data); // Emit 'message' event to all connected clients
+  })
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected');
+  });
+});
+
+(async () => {
+  await connect_db(DB_URI, DB_NAME);
+  await server.listen(PORT, HOST);
+  log.magenta(`API is live on http://${HOST}:${PORT}`);
 })().catch(log.error);

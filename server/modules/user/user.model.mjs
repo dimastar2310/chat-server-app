@@ -1,6 +1,8 @@
 import { ObjectId } from "mongodb";
 import log from "@ajar/marker";
 import { db } from "../../db/mongo.connection.mjs";
+import bcrypt from "bcrypt";
+
 
 log.yellow(`user.model loaded...`, 'db: ' + db);
 
@@ -10,6 +12,10 @@ log.yellow(`user.model loaded...`, 'db: ' + db);
 //console.log("the collection name is ?",collection);
 
 export async function create(user) {
+    //check if the user is already exist
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(user.password, salt);
     return await db.collection("Dima").insertOne(user);
 }
 
@@ -32,7 +38,7 @@ export async function getOne(userId) {
 export async function getOneByUser(user_name) {
     const users = db.collection("Dima");
     // const filter = { _id: userId };
-    log.red("at user.model")
+    //log.red("at user.model")
     const filter = { user: user_name };
     return await users.findOne(filter);
 }

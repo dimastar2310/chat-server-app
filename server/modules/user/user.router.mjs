@@ -8,10 +8,13 @@
 import express from 'express';
 import log from '@ajar/marker';
 import * as user_controller from "./user.controller.mjs";
+import bcrypt from "bcrypt";
 /* 
   if there is an error thrown in the DB, asyncMiddleware
   will pass it to next() and express will handle the error */
 import raw from "../../middleware/route.async.wrapper.mjs";
+
+
 
 log.magenta(`user.router loaded...`);
 
@@ -20,6 +23,44 @@ const router = express.Router();
 // parse json req.body on post routes
 router.use(express.json())
 
+// log.magenta('verifyAuth',req.url)
+// log.obj(req.session,'req.session:')
+router.post("/login",raw(async (req, res) => {
+  const { user:username, password } = req.body;
+
+
+  const user = await user_controller.getOneByUser(username);
+  if (!user) return res.status(403).json({ status: "username or possword is wrong!." });
+  //console.log("the username is ?",user);
+  //console.log("the password is ?",password);
+  
+  const password_is_valid = await bcrypt.compare(password, user.password)
+  if (!password_is_valid) return res.status(403).json({ status: "username or possword is wrong!." });
+
+
+  req.isAuthenticated = true;
+  res.status(200).json(user);
+  // Assuming '/chat' is a frontend route, send a response indicating success.
+ // res.redirect(200, '/chat'); redirection not so needed ,i can make 2 fetches in fron server
+})
+);
+
+const verifyAuth = (req,res,next)=>{
+  if(req.session.user){
+      next()
+  }else{
+      res.status(403).json({status:'unauthorized',payload:'You are unauthorized to access this route'})
+  }
+}
+//dont forget to make button for this
+router.get('/logout',(req,res)=>{
+  req.isAuthenticated = false;
+  res.status(200).json({status:'You are logged out'})
+})
+
+router.get('/protected',verifyAuth,(req,res)=>{ //i need to redirect it to chat
+  res.status(200).json({status:'OK',payload:'some sensitive data'})
+})
 // CREATES A NEW USER
 // router.post("/", async (req, res,next) => {
 //    try{
@@ -36,12 +77,31 @@ router.post("/register", raw( async (req, res) => {
   res.status(200).json(user);
 }) );
 
-// CREATES A NEW USER
-router.post("/", raw( async (req, res) => {
-    // TODO - validate req.body
-    const user = await user_controller.create(req.body);
-    res.status(200).json(user);
-}) );
+// // CREATES A NEW USER
+// router.post("/", raw( async (req, res) => {
+//     // TODO - validate req.body
+//     const user = await user_controller.create(req.body);
+//     res.status(200).json(user);
+// }) );
+// GETS A SINGLE by user and password
+//if this work fetch in fronted /chat
+// app.post('/api/login', (req,res)=> {
+//     log.obj(req.body,'body')
+//     const {email,password} = req.body;
+    
+//     if(email === testUser.email && password === testUser.password){
+//         req.session.user = testUser;
+//         log.obj(req.session,'set req.session:')
+//         const payload = {...testUser};
+//         delete payload.password;
+//         res.status(200).json({status:'you are authenticated', user:payload})
+//     }else{
+//         res.status(403).json({status:'wrong email or password'})
+//     }
+// });
+
+
+
 
 // GET ALL USERS
 router.get( "/",raw(async ( req , res) => {
@@ -68,14 +128,7 @@ router.get("/:id",raw(async (req, res) => {
     res.status(200).json(user);
   })
 );
-// GETS A SINGLE by user
-router.get("/:user",raw(async (req, res) => {
-  const user = await user_controller.getOneByUser(req.params.user)
-  console.log("the username is ?",req.body.user);
-  if (!user) return res.status(404).json({ status: "No user found." });
-  res.status(200).json(user);
-})
-);
+
 // UPDATES A SINGLE USER
 router.put("/:id",raw(async (req, res) => {
     const user = await user_controller.updateOne(req.params.id,req.body);
